@@ -39,7 +39,7 @@ find_package(PandoraSDK)
 find_package(LCContent)
 find_package(Gaudi)
 find_package(GSL)
-FIND_PACKAGE(MarlinTrk)
+find_package(MarlinTrk)
 find_package(LCIO)
 #---------------------------------------------------------------
 add_subdirectory(k4GaudiPandora)
