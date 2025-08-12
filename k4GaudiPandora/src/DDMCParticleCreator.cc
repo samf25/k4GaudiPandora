@@ -27,8 +27,8 @@
 
 #include "edm4hep/CaloHitContribution.h"
 #include "edm4hep/MCParticle.h"
-#include "edm4hep/MCRecoCaloAssociation.h"
-#include "edm4hep/MCRecoTrackerAssociation.h"
+#include "edm4hep/CaloHitSimCaloHitLinkCollection.h"
+#include "edm4hep/TrackerHitSimTrackerHitLinkCollection.h"
 #include "edm4hep/SimCalorimeterHit.h"
 #include "edm4hep/SimTrackerHit.h"
 #include "edm4hep/Track.h"
