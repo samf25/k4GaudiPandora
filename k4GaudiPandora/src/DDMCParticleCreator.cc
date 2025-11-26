@@ -41,8 +41,8 @@
 //forward declarations. See in DDPandoraPFANewProcessor.cc
 double getFieldFromCompact();
 
-DDMCParticleCreator::DDMCParticleCreator(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc)
-    : m_settings(settings), m_pandora(*pPandora), m_bField(getFieldFromCompact()), m_msgSvc(msgSvc) {}
+DDMCParticleCreator::DDMCParticleCreator(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm)
+    : m_settings(settings), m_pandora(*pPandora), m_bField(getFieldFromCompact()), m_thisAlg(algorithm) {}
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -51,8 +51,7 @@ DDMCParticleCreator::~DDMCParticleCreator() {}
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 pandora::StatusCode DDMCParticleCreator::CreateMCParticles(const std::vector<const edm4hep::MCParticleCollection*>& MCParticleCollections) {
-  MsgStream log(m_msgSvc, "MCParticleCreator");
-  log << MSG::DEBUG << "Creating MCParticles particles" << endmsg;
+  m_thisAlg->debug() << "Creating MCParticles particles" << endmsg;
 
   for (int colIndex = 0; colIndex < MCParticleCollections.size(); colIndex++) {
     try {
@@ -75,7 +74,7 @@ pandora::StatusCode DDMCParticleCreator::CreateMCParticles(const std::vector<con
           
           uint64_t ID = (collectionID << 32) | i;
           mcParticleParameters.m_pParentAddress = reinterpret_cast<void*>(ID);
-          log << MSG::DEBUG << "Creating MCP with ID: " << ID << endmsg;  
+          m_thisAlg->debug() << "Creating MCP with ID: " << ID << endmsg;  
 
           mcParticleParameters.m_momentum       = pandora::CartesianVector(
               pMcParticle.getMomentum().x, pMcParticle.getMomentum().y, pMcParticle.getMomentum().z);
@@ -95,11 +94,11 @@ pandora::StatusCode DDMCParticleCreator::CreateMCParticles(const std::vector<con
               m_pandora, reinterpret_cast<void*>(ID), reinterpret_cast<void*>(daughterID)));
           }
         } catch (pandora::StatusCodeException& statusCodeException) {
-          log << MSG::ERROR << "Failed to extract MCParticle: " << statusCodeException.ToString() << endmsg;
+          m_thisAlg->error() << "Failed to extract MCParticle: " << statusCodeException.ToString() << endmsg;
         }
       }
     } catch(...) {
-      log << MSG::ERROR << "Failed to extract MCParticle collection" << endmsg;
+      m_thisAlg->error() << "Failed to extract MCParticle collection" << endmsg;
     }
   }
 
@@ -113,8 +112,7 @@ pandora::StatusCode DDMCParticleCreator::CreateTrackToMCParticleRelationships(
   const TrackVector&    trackVector,
   const std::vector<const edm4hep::TrackCollection*>& trackCollections
 ) const {
-  MsgStream log(m_msgSvc, "MCParticleCreator");
-  log << MSG::DEBUG << "Creating Track-MCParticle Links." << endmsg;
+  m_thisAlg->debug() << "Creating Track-MCParticle Links." << endmsg;
 
   std::unordered_map<int, const edm4hep::TrackCollection*> trackCollectionMap;
   for (auto* collection : trackCollections) { trackCollectionMap[collection->getID()] = collection; }
@@ -172,12 +170,12 @@ pandora::StatusCode DDMCParticleCreator::CreateTrackToMCParticleRelationships(
 
       if (0 == pBestMCParticle)
         continue;
-      log << MSG::DEBUG << "Linking Track: " << trackID << " with MCP: " << pBestMCParticle << endmsg;
+      m_thisAlg->debug() << "Linking Track: " << trackID << " with MCP: " << pBestMCParticle << endmsg;
       PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, PandoraApi::SetTrackToMCParticleRelationship(
         m_pandora, reinterpret_cast<void*>(trackID), reinterpret_cast<void*>(pBestMCParticle)));
     } catch (pandora::StatusCodeException& statusCodeException) {
-      log << MSG::ERROR << "Failed to extract track to mc particle relationship: " << statusCodeException.ToString()
-                           << endmsg;
+      m_thisAlg->error() << "Failed to extract track to mc particle relationship: " << statusCodeException.ToString()
+                         << endmsg;
     }
   }
 
@@ -196,8 +194,7 @@ pandora::StatusCode DDMCParticleCreator::CreateCaloHitToMCParticleRelationships(
   const std::vector<const edm4hep::CalorimeterHitCollection*>& lCalCollections,
   const std::vector<const edm4hep::CalorimeterHitCollection*>& lhCalCollections
 ) const {
-  MsgStream log(m_msgSvc, "MCParticleCreator");
-  log << MSG::DEBUG << "Creating CalorimeterHit-MCParticle Links." << endmsg;
+  m_thisAlg->debug() << "Creating CalorimeterHit-MCParticle Links." << endmsg;
 
   std::unordered_map<int, const edm4hep::CalorimeterHitCollection*> calorimeterCollectionMap;
   auto processCollections = [&](const std::vector<const edm4hep::CalorimeterHitCollection*>& collections) {
@@ -252,12 +249,12 @@ pandora::StatusCode DDMCParticleCreator::CreateCaloHitToMCParticleRelationships(
               m_pandora, reinterpret_cast<void*>(storedID), reinterpret_cast<void*>(mcParticleIter->first), mcParticleIter->second));
           }
         } catch (pandora::StatusCodeException& statusCodeException) {
-          log << MSG::ERROR << "Failed to extract calo hit to mc particle relationship: "
-                               << statusCodeException.ToString() << endmsg;
+          m_thisAlg->error() << "Failed to extract calo hit to mc particle relationship: "
+                             << statusCodeException.ToString() << endmsg;
         } 
       }
     } catch(...) {
-      log << MSG::ERROR << "Failed to extract Calo MCP Link collection" << endmsg;
+      m_thisAlg->error() << "Failed to extract Calo MCP Link collection" << endmsg;
     }
   }
 

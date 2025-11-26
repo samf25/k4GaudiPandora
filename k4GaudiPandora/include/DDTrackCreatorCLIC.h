@@ -43,7 +43,7 @@
       *  @param  settings the creator settings
       *  @param  pPandora address of the relevant pandora instance
       */
-   DDTrackCreatorCLIC(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+   DDTrackCreatorCLIC(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
  
    /**
       *  @brief  Destructor

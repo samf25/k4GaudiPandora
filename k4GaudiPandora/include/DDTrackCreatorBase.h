@@ -28,14 +28,13 @@
 #ifndef DDTRACK_CREATOR_BASE_H
 #define DDTRACK_CREATOR_BASE_H 1
 
-#include "lcio.h"
 
 #include "edm4hep/VertexCollection.h"
 #include "edm4hep/Track.h"
 #include "edm4hep/Vertex.h"
 #include "DDSegmentation/BitFieldCoder.h"
-#include <MarlinTrk/Factory.h>
-#include <MarlinTrk/IMarlinTrack.h>
+#include "k4Reco/GaudiDDKalTestTrack.h"
+
 
 #include <k4FWCore/Transformer.h>
 #include <edm4hep/TrackCollection.h>
@@ -92,28 +91,24 @@ public:
     float m_z0UnmatchedVertexTrackCut;  ///< z0 cut used to determine whether unmatched vertex track can form pfo
     float m_zCutForNonVertexTracks;     ///< Non vtx track z cut to determine whether track can be used to form pfo
 
-    int m_reachesECalNBarrelTrackerHits;  ///< Minimum number of barrel tracker hits to consider track as reaching ecal
-    int m_reachesECalNFtdHits;            ///< Minimum number of ftd hits to consider track as reaching ecal
-    float
-        m_reachesECalBarrelTrackerOuterDistance;  ///< Max distance from track to barrel tracker r max to id whether track reaches ecal
-    int m_reachesECalMinFtdLayer;  ///< Min layer in Ftd for tracks to be considered to have reached decal
-    float
-        m_reachesECalBarrelTrackerZMaxDistance;  ///< Max distance from track to barrel tracker z max to id whether track reaches ecal
-    float m_reachesECalFtdZMaxDistance;  ///< Max distance from track hit to ftd z position to identify ftd hits
-    float m_curvatureToMomentumFactor;   ///< Constant relating track curvature in b field to momentum
+    int   m_reachesECalNBarrelTrackerHits;          ///< Minimum number of barrel tracker hits to consider track as reaching ecal
+    int   m_reachesECalNFtdHits;                    ///< Minimum number of ftd hits to consider track as reaching ecal
+    float m_reachesECalBarrelTrackerOuterDistance;  ///< Max distance from track to barrel tracker r max to id whether track reaches ecal
+    int   m_reachesECalMinFtdLayer;                 ///< Min layer in Ftd for tracks to be considered to have reached decal
+    float m_reachesECalBarrelTrackerZMaxDistance;   ///< Max distance from track to barrel tracker z max to id whether track reaches ecal
+    float m_reachesECalFtdZMaxDistance;             ///< Max distance from track hit to ftd z position to identify ftd hits
+    float m_curvatureToMomentumFactor;              ///< Constant relating track curvature in b field to momentum
 
-    float m_minTrackECalDistanceFromIp;  ///< Sanity check on separation between ip and track projected ecal position
-    float m_maxTrackSigmaPOverP;         ///< Track fraction momentum error cut
-    float
-        m_minMomentumForTrackHitChecks;  ///< Min track momentum required to perform final quality checks on number of hits
+    float m_minTrackECalDistanceFromIp;    ///< Sanity check on separation between ip and track projected ecal position
+    float m_maxTrackSigmaPOverP;           ///< Track fraction momentum error cut
+    float m_minMomentumForTrackHitChecks;  ///< Min track momentum required to perform final quality checks on number of hits
 
-    float
-        m_maxBarrelTrackerInnerRDistance;  ///< Track cut on distance from barrel tracker inner r to id whether track can form pfo
+    float m_maxBarrelTrackerInnerRDistance;         ///< Track cut on distance from barrel tracker inner r to id whether track can form pfo
     float m_minBarrelTrackerHitFractionOfExpected;  ///< Minimum fraction of TPC hits compared to expected
     int   m_minFtdHitsForBarrelTrackerHitFraction;  ///< Minimum number of FTD hits to ignore TPC hit fraction
-    float
-        m_trackStateTolerance;  ///< distance below tracker ecal radius the second trackstate in the ecal endcap is still passed to pandora
-    std::string m_trackingSystemName;  ///< name of the tracking system used for getting new track states
+
+    float m_trackStateTolerance;          ///< distance below tracker ecal radius the second trackstate in the ecal endcap is still passed to pandora
+    std::string m_trackingSystemName;     ///< name of the tracking system used for getting new track states
     std::string m_trackingEncodingString; ///< encoding string for the tracking system
 
     ///Nikiforos: Moved from main class
@@ -133,7 +128,7 @@ public:
      *  @param  settings the creator settings
      *  @param  pPandora address of the relevant pandora instance
      */
-  DDTrackCreatorBase(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+  DDTrackCreatorBase(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
 
   /**
      *  @brief  Destructor
@@ -176,17 +171,19 @@ protected:
   const Settings          m_settings;  ///< The track creator settings
   const pandora::Pandora& m_pandora;   ///< Reference to the pandora object to create tracks and track relationships
 
-  TrackVector   m_trackVector;        ///< The track vector
-  TrackList     m_v0TrackList;        ///< The list of v0 tracks
-  TrackList     m_parentTrackList;    ///< The list of parent tracks
-  TrackList     m_daughterTrackList;  ///< The list of daughter tracks
-  TrackToPidMap m_trackToPidMap;      ///< The map from track addresses to particle ids, where set by kinks/V0s
-  float         m_minimalTrackStateRadiusSquared;                      ///< minimal track state radius, derived value
-  std::shared_ptr<MarlinTrk::IMarlinTrkSystem> m_trackingSystem={}; ///< Tracking system used for track states
+  TrackVector    m_trackVector;        ///< The track vector
+  TrackList      m_v0TrackList;        ///< The list of v0 tracks
+  TrackList      m_parentTrackList;    ///< The list of parent tracks
+  TrackList      m_daughterTrackList;  ///< The list of daughter tracks
+  TrackToPidMap  m_trackToPidMap;      ///< The map from track addresses to particle ids, where set by kinks/V0s
+  float          m_minimalTrackStateRadiusSquared;                      ///< minimal track state radius, derived value
   std::shared_ptr<lc_content::LCTrackFactory>  m_lcTrackFactory = {};  ///< LCTrackFactor for creating LCTracks
+  GaudiDDKalTest m_ddkaltest;
 
   dd4hep::DDSegmentation::BitFieldCoder m_encoder;
-  IMessageSvc* m_msgSvc;
+  // logging from Gaudi
+  const Gaudi::Algorithm* m_thisAlg;
+
 
 
   ///Nikiforos: Need to implement following abstract functions according to detector model

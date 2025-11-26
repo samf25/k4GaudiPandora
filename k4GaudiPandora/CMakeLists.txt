@@ -10,8 +10,7 @@ gaudi_add_module(k4GaudiPandoraPlugins
 				${PandoraSDK_LIBRARIES}
 				${LCContent_LIBRARIES}
 				${GSL_LIBRARIES}
-                                ${LCIO_LIBRARIES}
-                                ${MarlinTrk_LIBRARIES}
+                                k4Reco::GaudiTrkUtils
 				DD4hep::DDCore
                                 ROOT::Hist
                                 ${ROOT_LIBRARIES}
@@ -33,8 +32,6 @@ TARGET_INCLUDE_DIRECTORIES(k4GaudiPandoraPlugins
 			${GSL_INCLUDE_DIRS}
 			${PandoraSDK_INCLUDE_DIRS}
                         ${LCConent_INCLUDE_DIRS}
-                        ${LCIO_INCLUDE_DIRS}
-                        ${MarlinTrk_INCLUDE_DIRS}
+                        ${k4Reco_INCLUDE_DIRS}
 			${DD4hep_INCLUDE_DIRS}
-			${LCContent_INCLUDE_DIRS}
                         ${ROOT_INCLUDE_DIRS})

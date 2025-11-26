@@ -137,7 +137,7 @@ public:
      *  @param  settings the creator settings
      *  @param  pPandora address of the relevant pandora instance
      */
-  DDCaloHitCreator(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+  DDCaloHitCreator(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
 
   /**
      *  @brief  Destructor
@@ -268,9 +268,10 @@ private:
   float GetMaximumRadius(edm4hep::CalorimeterHit pCaloHit, const unsigned int symmetryOrder,
                          const float phi0) const;
 
-  const Settings m_settings;  ///< The calo hit creator settings
-
-  const pandora::Pandora& m_pandora;  ///< Reference to the pandora object to create calo hits
+  const Settings m_settings;           ///< The calo hit creator settings
+  const Gaudi::Algorithm* m_thisAlg;   ///< Pointer to the Gaudi algorithm for logging
+  const pandora::Pandora& m_pandora;   ///< Reference to the pandora object to create calo hits
+  dd4hep::DDSegmentation::BitFieldCoder m_cell_encoder;
 
   float m_hCalBarrelLayerThickness;  ///< HCal barrel layer thickness
   float m_hCalEndCapLayerThickness;  ///< HCal endcap layer thickness
@@ -279,8 +280,6 @@ private:
 
   dd4hep::VolumeManager m_volumeManager;  ///< DD4hep volume manager
 
-  dd4hep::DDSegmentation::BitFieldCoder m_cell_encoder;
-  IMessageSvc* m_msgSvc;
 };
 
 //------------------------------------------------------------------------------------------------------------------------------------------

@@ -26,18 +26,13 @@
  */
 
 #include "edm4hep/ReconstructedParticle.h"
-
+#include "DDPandoraPFANewAlgorithm.h"
 
 #include <LCObjects/LCTrack.h>
 #include "DDTrackCreatorBase.h"
 #include "Pandora/PdgTable.h"
 
-#include "IMPL/TrackerHitImpl.h"
-#include "IMPL/TrackStateImpl.h"
-#include "UTIL/ILDConf.h"
-#include "UTIL/Operators.h"
-
-
+#include "k4Interface/IGeoSvc.h"
 #include "DD4hep/DD4hepUnits.h"
 #include "DD4hep/Detector.h"
 #include "DDRec/DetectorData.h"
@@ -49,7 +44,7 @@
 //forward declaration
 std::vector<double> getTrackingRegionExtent();
 
-DDTrackCreatorBase::DDTrackCreatorBase(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc)
+DDTrackCreatorBase::DDTrackCreatorBase(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm)
     : m_settings(settings),
       m_pandora(*pPandora),
       m_v0TrackList(TrackList()),
@@ -57,17 +52,15 @@ DDTrackCreatorBase::DDTrackCreatorBase(const Settings& settings, const pandora::
       m_daughterTrackList(TrackList()),
       m_trackToPidMap(TrackToPidMap()),
       m_minimalTrackStateRadiusSquared(0.f),
-      m_msgSvc(msgSvc) {
+      m_thisAlg(algorithm),
+      m_ddkaltest(m_thisAlg) {
   const float ecalInnerR           = settings.m_eCalBarrelInnerR;
   const float tsTolerance          = settings.m_trackStateTolerance;
   m_minimalTrackStateRadiusSquared = (ecalInnerR - tsTolerance) * (ecalInnerR - tsTolerance);
-  m_trackingSystem =
-  std::shared_ptr<MarlinTrk::IMarlinTrkSystem>( MarlinTrk::Factory::createMarlinTrkSystem(settings.m_trackingSystemName,
-                                                                                          nullptr, ""),
-                                                [](MarlinTrk::IMarlinTrkSystem*){} );
-  m_trackingSystem->init();
 
   m_encoder = dd4hep::DDSegmentation::BitFieldCoder(settings.m_trackingEncodingString);
+  m_ddkaltest.init();
+  m_ddkaltest.setEncoder(m_encoder);
   m_lcTrackFactory = std::make_shared<lc_content::LCTrackFactory>();
 }
 
@@ -92,9 +85,10 @@ pandora::StatusCode DDTrackCreatorBase::CreateTrackAssociations(
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-pandora::StatusCode DDTrackCreatorBase::ExtractKinks(const std::vector<const edm4hep::VertexCollection*>& vertexCollections) {
-  MsgStream log(m_msgSvc, "TrackCreator");
-  log << MSG::DEBUG << "Extracting Kinks" << endmsg;
+pandora::StatusCode DDTrackCreatorBase::ExtractKinks(
+  const std::vector<const edm4hep::VertexCollection*>& vertexCollections
+) {
+  m_thisAlg->debug() << "Extracting Kinks" << endmsg;
 
   for (int colIndex = 0; colIndex < vertexCollections.size(); colIndex++) {
     try {
@@ -117,7 +111,7 @@ pandora::StatusCode DDTrackCreatorBase::ExtractKinks(const std::vector<const edm
             uint64_t pTrackID = (static_cast<uint64_t>(pTrack.getObjectID().collectionID) << 32) | pTrack.getObjectID().index;
 
             (0 == iTrack) ? m_parentTrackList.insert(pTrackID) : m_daughterTrackList.insert(pTrackID);
-            log << MSG::DEBUG << "KinkTrack " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
+            m_thisAlg->debug() << "KinkTrack " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
 
             int trackPdgCode = pandora::UNKNOWN_PARTICLE_TYPE;
 
@@ -176,11 +170,11 @@ pandora::StatusCode DDTrackCreatorBase::ExtractKinks(const std::vector<const edm
             }
           }
         } catch (...) {
-          log << MSG::WARNING << "Failed to extract kink vertex"   << endmsg;
+          m_thisAlg->warning()  << "Failed to extract kink vertex"   << endmsg;
         }
       }
     } catch (...) {
-      log << MSG::DEBUG << "Failed to extract kink vertex collection" << endmsg;
+      m_thisAlg->debug() << "Failed to extract kink vertex collection" << endmsg;
     }
   }
 
@@ -189,10 +183,11 @@ pandora::StatusCode DDTrackCreatorBase::ExtractKinks(const std::vector<const edm
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-pandora::StatusCode DDTrackCreatorBase::ExtractProngsAndSplits(const std::vector<const edm4hep::VertexCollection*>& prongCollections, 
-                                                               const std::vector<const edm4hep::VertexCollection*>& splitCollections) {
-  MsgStream log(m_msgSvc, "TrackCreator");
-  log << MSG::DEBUG << "Extracting Prongs and Splits." << endmsg;
+pandora::StatusCode DDTrackCreatorBase::ExtractProngsAndSplits(
+  const std::vector<const edm4hep::VertexCollection*>& prongCollections, 
+  const std::vector<const edm4hep::VertexCollection*>& splitCollections
+) {
+  m_thisAlg->debug() << "Extracting Prongs and Splits." << endmsg;
 
   std::vector<const edm4hep::VertexCollection*> vertexCollections;
   vertexCollections.insert(vertexCollections.end(), prongCollections.begin(), prongCollections.end());
@@ -217,7 +212,7 @@ pandora::StatusCode DDTrackCreatorBase::ExtractProngsAndSplits(const std::vector
             uint64_t pTrackID = (static_cast<uint64_t>(pTrack.getObjectID().collectionID) << 32) | pTrack.getObjectID().index;
 
             (0 == iTrack) ? m_parentTrackList.insert(pTrackID) : m_daughterTrackList.insert(pTrackID);
-            log << MSG::DEBUG << "Prong or Split Track " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
+            m_thisAlg->debug() << "Prong or Split Track " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
 
             if (0 == m_settings.m_shouldFormTrackRelationships)
               continue;
@@ -246,11 +241,11 @@ pandora::StatusCode DDTrackCreatorBase::ExtractProngsAndSplits(const std::vector
             }
           }
         } catch (...) {
-          log << MSG::WARNING << "Failed to extract prong/split vertex" << endmsg;
+          m_thisAlg->warning()  << "Failed to extract prong/split vertex" << endmsg;
         }
       }
     } catch (...) {
-      log << MSG::DEBUG << "Failed to extract prong/split vertex collection: " << endmsg;
+      m_thisAlg->debug() << "Failed to extract prong/split vertex collection: " << endmsg;
     }
   }
 
@@ -259,9 +254,10 @@ pandora::StatusCode DDTrackCreatorBase::ExtractProngsAndSplits(const std::vector
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-pandora::StatusCode DDTrackCreatorBase::ExtractV0s(const std::vector<const edm4hep::VertexCollection*>& vertexCollections) {
-  MsgStream log(m_msgSvc, "TrackCreator");
-  log << MSG::DEBUG << "Extracting V0s." << endmsg;
+pandora::StatusCode DDTrackCreatorBase::ExtractV0s(
+  const std::vector<const edm4hep::VertexCollection*>& vertexCollections
+) {
+  m_thisAlg->debug() << "Extracting V0s." << endmsg;
 
   for (int colIndex = 0; colIndex < vertexCollections.size(); colIndex++) {
     try {
@@ -283,7 +279,7 @@ pandora::StatusCode DDTrackCreatorBase::ExtractV0s(const std::vector<const edm4h
             edm4hep::Track pTrack = pReconstructedParticle.getTracks(iTrack);
             uint64_t pTrackID = (static_cast<uint64_t>(pTrack.getObjectID().collectionID) << 32) | pTrack.getObjectID().index;
             m_v0TrackList.insert(pTrackID);
-            log << MSG::DEBUG << "V0Track " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
+            m_thisAlg->debug() << "V0Track " << iTrack << ", nHits " << pTrack.trackerHits_size() << endmsg;
 
             int trackPdgCode = pandora::UNKNOWN_PARTICLE_TYPE;
 
@@ -321,11 +317,11 @@ pandora::StatusCode DDTrackCreatorBase::ExtractV0s(const std::vector<const edm4h
             }
           }
         } catch (...) {
-          log << MSG::WARNING << "Failed to extract v0 vertex" << endmsg;
+          m_thisAlg->warning()  << "Failed to extract v0 vertex" << endmsg;
         }
       }
     } catch (...) {
-      log << MSG::DEBUG << "Failed to extract v0 vertex collection" << endmsg;
+      m_thisAlg->debug() << "Failed to extract v0 vertex collection" << endmsg;
     }
   }
 
@@ -348,15 +344,17 @@ bool DDTrackCreatorBase::IsConflictingRelationship(const edm4hep::ReconstructedP
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-void DDTrackCreatorBase::GetTrackStates(edm4hep::Track    pTrack,
-                                        PandoraApi::Track::Parameters& trackParameters) const {
+void DDTrackCreatorBase::GetTrackStates(
+  edm4hep::Track                  pTrack,
+  PandoraApi::Track::Parameters&  trackParameters
+) const {
   const edm4hep::TrackState pTrackState = pTrack.getTrackStates(edm4hep::TrackState::AtIP);
 
   const double pt(m_settings.m_bField * 2.99792e-4 / std::fabs(pTrackState.omega));
   trackParameters.m_momentumAtDca =
-      pandora::CartesianVector(std::cos(pTrackState.phi), std::sin(pTrackState.phi),
-                               pTrackState.tanLambda) *
-      pt;
+    pandora::CartesianVector(
+      std::cos(pTrackState.phi), std::sin(pTrackState.phi),
+      pTrackState.tanLambda) * pt;
 
   edm4hep::TrackState firstHit = pTrack.getTrackStates(edm4hep::TrackState::AtFirstHit);
   this->CopyTrackState(firstHit, trackParameters.m_trackStateAtStart);
@@ -386,8 +384,10 @@ void DDTrackCreatorBase::GetTrackStates(edm4hep::Track    pTrack,
 
 float DDTrackCreatorBase::CalculateTrackTimeAtCalorimeter(edm4hep::Track pTrack) const {
   edm4hep::TrackState state = pTrack.getTrackStates(edm4hep::TrackState::AtIP);
-  const pandora::Helix            helix(state.phi, state.D0, state.Z0, state.omega,
-                                        state.tanLambda, m_settings.m_bField);
+  const pandora::Helix helix(
+    state.phi, state.D0, state.Z0, state.omega,
+    state.tanLambda, m_settings.m_bField
+  );
   const pandora::CartesianVector& referencePoint(helix.GetReferencePoint());
 
   // First project to endcap
@@ -421,7 +421,8 @@ float DDTrackCreatorBase::CalculateTrackTimeAtCalorimeter(edm4hep::Track pTrack)
     // Cylinder
     float                     genericTime(std::numeric_limits<float>::max());
     const pandora::StatusCode statusCode(
-        helix.GetPointOnCircle(m_settings.m_eCalBarrelInnerR, referencePoint, barrelProjection, genericTime));
+      helix.GetPointOnCircle(m_settings.m_eCalBarrelInnerR, referencePoint, barrelProjection, genericTime)
+    );
 
     if ((pandora::STATUS_CODE_SUCCESS == statusCode) && (genericTime < minGenericTime)) {
       minGenericTime     = genericTime;
@@ -437,8 +438,10 @@ float DDTrackCreatorBase::CalculateTrackTimeAtCalorimeter(edm4hep::Track pTrack)
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-void DDTrackCreatorBase::CopyTrackState(const edm4hep::TrackState pTrackState,
-                                        pandora::InputTrackState& inputTrackState) const {
+void DDTrackCreatorBase::CopyTrackState(
+  const edm4hep::TrackState pTrackState,
+  pandora::InputTrackState& inputTrackState
+) const {
   const double pt(m_settings.m_bField * 2.99792e-4 / std::fabs(pTrackState.omega));
 
   const double px(pt * std::cos(pTrackState.phi));
@@ -450,129 +453,108 @@ void DDTrackCreatorBase::CopyTrackState(const edm4hep::TrackState pTrackState,
   const double zs(pTrackState.referencePoint.z);
 
   inputTrackState = pandora::TrackState(xs, ys, zs, px, py, pz);
-  
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-void DDTrackCreatorBase::GetTrackStatesAtCalo(edm4hep::Track track, lc_content::LCTrackParameters& trackParameters) {
-  MsgStream log(m_msgSvc, "TrackCreator");
+void DDTrackCreatorBase::GetTrackStatesAtCalo(
+  edm4hep::Track track, 
+  lc_content::LCTrackParameters& trackParameters
+) {
   if( not trackParameters.m_reachesCalorimeter.Get() ) {
-      log << MSG::DEBUG << "Track does not reach the ECal" <<endmsg;
+    m_thisAlg->debug() << "Track does not reach the ECal" <<endmsg;
     return;
   }
   
   const edm4hep::TrackState trackAtCalo0 = track.getTrackStates(edm4hep::TrackState::AtCalorimeter);
   const edm4hep::TrackState *trackAtCalo = &trackAtCalo0;
   if( not trackAtCalo ) {
-      log << MSG::DEBUG << "Track does not have a trackState at calorimeter" <<endmsg;
-      log << MSG::DEBUG << track << endmsg;
-      return;
+    m_thisAlg->debug() << "Track does not have a trackState at calorimeter" <<endmsg;
+    m_thisAlg->debug() << track << endmsg;
+    return;
   }
   
-  log << MSG::DEBUG << "Original " << *trackAtCalo << endmsg;
+  m_thisAlg->debug() << "Original " << *trackAtCalo << endmsg;
   
   edm4hep::Vector3f tsPosition = trackAtCalo->referencePoint;
   
   if( std::fabs(tsPosition.z) <  getTrackingRegionExtent()[2] ) {
-      log << MSG::DEBUG << "Original trackState is at Barrel" << endmsg;
+      m_thisAlg->debug() << "Original trackState is at Barrel" << endmsg;
       pandora::InputTrackState pandoraTrackState;
       this->CopyTrackState( trackAtCalo0, pandoraTrackState );
       trackParameters.m_trackStates.push_back( pandoraTrackState );
   } else { // if track state is in endcap we do not repeat track state calculation, because the barrel cannot be hit
-      log << MSG::DEBUG << "Original track state is at Endcap" << endmsg;
+      m_thisAlg->debug() << "Original track state is at Endcap" << endmsg;
       pandora::InputTrackState pandoraTrackState;
       this->CopyTrackState( trackAtCalo0, pandoraTrackState );
       trackParameters.m_trackStates.push_back( pandoraTrackState );
       return;
   }
 
-  auto marlintrk = std::unique_ptr<MarlinTrk::IMarlinTrack>(m_trackingSystem->createTrack());
-
-  for (edm4hep::TrackerHit hit : track.getTrackerHits()) {
-    IMPL::TrackerHitImpl* trkHit = new IMPL::TrackerHitImpl();
-    trkHit->setCellID0(hit.getCellID());
-    trkHit->setEDep(hit.getEDep());
-    trkHit->setEDepError(hit.getEDepError());
-    trkHit->setTime(hit.getTime());
-    trkHit->setType(hit.getType());
-    trkHit->setQuality(hit.getQuality());
-    const double pos[3] = {hit.getPosition().x, hit.getPosition().y, hit.getPosition().z};
-    trkHit->setPosition(pos);
-
-    if( marlintrk->addHit(trkHit)  != MarlinTrk::IMarlinTrack::success  )
-      log << MSG::DEBUG << "DDTrackCreatorBase::GetTrackStatesAtCalo failed to add tracker hit \n" << *trkHit << endmsg;
+  auto gaudi_trk = GaudiDDKalTestTrack(m_thisAlg, const_cast<GaudiDDKalTest*>(&m_ddkaltest));
+  std::vector<const edm4hep::TrackerHit*> trkHitsPtr;
+  trkHitsPtr.reserve(track.trackerHits_size());
+  for (const edm4hep::TrackerHit& hit : track.getTrackerHits()) {
+    trkHitsPtr.push_back( &hit );
+    if( gaudi_trk.addHit( &hit ) != 0) {
+      m_thisAlg->debug() << "DDTrackCreatorBase::GetTrackStatesAtCalo failed to add tracker hit \n" << hit << endmsg;
+    }
   }
   
-  bool tanL_is_positive = trackAtCalo->tanLambda>0;
-  IMPL::TrackStateImpl* trackState = new IMPL::TrackStateImpl();
-  trackState->setD0(trackAtCalo->D0);
-  trackState->setZ0(trackAtCalo->Z0);
-  trackState->setPhi(trackAtCalo->phi);
-  trackState->setOmega(trackAtCalo->omega);
-  trackState->setTanLambda(trackAtCalo->tanLambda);
-  const float pos[3] = {trackAtCalo->referencePoint.x, trackAtCalo->referencePoint.y, trackAtCalo->referencePoint.z};
-  trackState->setReferencePoint(pos);
-  const EVENT::FloatVec covMatrix(trackAtCalo->covMatrix.begin(), trackAtCalo->covMatrix.end());
-  trackState->setCovMatrix(covMatrix);
-  
-  int return_error  = marlintrk->initialise(*trackState, m_settings.m_bField, MarlinTrk::IMarlinTrack::modeForward);
-  if (return_error != MarlinTrk::IMarlinTrack::success ) {
-    log << MSG::DEBUG << "DDTrackCreatorBase::GetTrackStatesAtCalo failed to initialize track for endcap track : " << endmsg ;
+  int return_error  = gaudi_trk.initialise(trackAtCalo0, true);
+  if (return_error != 0 ) {
+    m_thisAlg->debug() << "DDTrackCreatorBase::GetTrackStatesAtCalo failed to initialize track for endcap track : " << endmsg ;
     return ;
   }
   
   double chi2 = -DBL_MAX;
   int ndf = 0;
   
-  IMPL::TrackStateImpl trackStateAtCaloEndcap;
+  edm4hep::TrackState trackStateAtCaloEndcap;
   
-  unsigned ecal_endcap_face_ID = lcio::ILDDetID::ECAL_ENDCAP;
+  // Retrieve DetID_ECal_Endcap from GeoSvc
+  unsigned ecal_endcap_face_ID = 29; // default value
+  int detID = ((DDPandoraPFANewAlgorithm*)m_thisAlg)->getGeoID("DetID_ECal_Endcap");
+  if (detID >= 0) {
+    ecal_endcap_face_ID = static_cast<unsigned>(detID);
+  }
+
+  bool tanL_is_positive = trackAtCalo0.tanLambda > 0;
   int detElementID = 0;
   uint64_t cellID = 0;
-  m_encoder.set(cellID, lcio::LCTrackerCellID::subdet(), ecal_endcap_face_ID);
-  m_encoder.set(cellID, lcio::LCTrackerCellID::side(), (tanL_is_positive ? lcio::ILDDetID::fwd : lcio::ILDDetID::bwd));
-  m_encoder.set(cellID, lcio::LCTrackerCellID::layer(), 0);
 
-  return_error = marlintrk->propagateToLayer(m_encoder.lowWord(cellID), trackStateAtCaloEndcap, chi2, ndf,
-                                             detElementID, MarlinTrk::IMarlinTrack::modeForward );
-  log << MSG::DEBUG << "Found trackState at endcap? Error code: " << return_error  << endmsg;
+  m_encoder.set(cellID, "system", ecal_endcap_face_ID);
+  m_encoder.set(cellID, "side", (tanL_is_positive ? 0 : 1));
+  m_encoder.set(cellID, "layer", 0);
 
-  if (return_error == MarlinTrk::IMarlinTrack::success ) {
-    log << MSG::DEBUG << "Endcap" << trackStateAtCaloEndcap << endmsg;
-    const auto* tsEP = trackStateAtCaloEndcap.getReferencePoint();
-    const double radSquared = ( tsEP[0]*tsEP[0] + tsEP[1]*tsEP[1] );
+  return_error = gaudi_trk.propagateToLayer(
+    m_encoder.lowWord(cellID), trkHitsPtr.back(), trackStateAtCaloEndcap,
+    chi2, ndf, detElementID, true 
+  );
+  m_thisAlg->debug() << "Found trackState at endcap? Error code: " << return_error  << endmsg;
+
+  if (return_error == 0 ) {
+    m_thisAlg->debug() << "Endcap" << trackStateAtCaloEndcap << endmsg;
+    edm4hep::Vector3f tsEP = trackStateAtCaloEndcap.referencePoint;
+    const double radSquared = ( tsEP.x*tsEP.x + tsEP.y*tsEP.y );
     if( radSquared < m_minimalTrackStateRadiusSquared ) {
-      log << MSG::DEBUG << "new track state is below tolerance radius" << endmsg;
+      m_thisAlg->debug() << "new track state is below tolerance radius" << endmsg;
       return;
     }
     //for curling tracks the propagated track has the wrong z0 whereas it should be 0. really
-    if( std::abs( trackStateAtCaloEndcap.getZ0() ) >
-        std::abs( 2.*M_PI/trackStateAtCaloEndcap.getOmega() * trackStateAtCaloEndcap.getTanLambda() ) ){
-        trackStateAtCaloEndcap.setZ0( 0. );
+    if( std::abs( trackStateAtCaloEndcap.Z0 ) > std::abs( 2.*M_PI/trackStateAtCaloEndcap.omega * trackStateAtCaloEndcap.tanLambda ) ){
+      trackStateAtCaloEndcap.Z0 = 0. ;
     }
-    log << MSG::DEBUG << "new track state at endcap accepted" << endmsg;
-
-    edm4hep::TrackState edmStateAtCaloEndcap;
-    edmStateAtCaloEndcap.D0 = trackStateAtCaloEndcap.getD0();
-    edmStateAtCaloEndcap.Z0 = trackStateAtCaloEndcap.getZ0();
-    edmStateAtCaloEndcap.phi = trackStateAtCaloEndcap.getPhi();
-    edmStateAtCaloEndcap.omega = trackStateAtCaloEndcap.getOmega();
-    edmStateAtCaloEndcap.tanLambda = trackStateAtCaloEndcap.getTanLambda();
-    edmStateAtCaloEndcap.referencePoint = {
-      trackStateAtCaloEndcap.getReferencePoint()[0],
-      trackStateAtCaloEndcap.getReferencePoint()[1],
-      trackStateAtCaloEndcap.getReferencePoint()[2]
-    };
-    std::copy(trackStateAtCaloEndcap.getCovMatrix().begin(), trackStateAtCaloEndcap.getCovMatrix().end(), edmStateAtCaloEndcap.covMatrix.begin());
+    m_thisAlg->debug() << "new track state at endcap accepted" << endmsg;
 
     pandora::InputTrackState pandoraAtEndcap;
-    this->CopyTrackState( edmStateAtCaloEndcap, pandoraAtEndcap );
+    this->CopyTrackState( trackStateAtCaloEndcap, pandoraAtEndcap );
     trackParameters.m_trackStates.push_back( pandoraAtEndcap );
   }
 
   return;
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------
 DDTrackCreatorBase::Settings::Settings()
     : m_shouldFormTrackRelationships(1),

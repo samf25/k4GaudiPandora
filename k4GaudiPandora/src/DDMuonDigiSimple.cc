@@ -22,7 +22,6 @@
 #include "DD4hep/DD4hepUnits.h"
 #include "DD4hep/Detector.h"
 #include "DDRec/DetectorData.h"
-#include "GaudiKernel/MsgStream.h"
 #include "edm4hep/CalorimeterHit.h"
 #include "edm4hep/Constants.h"
 
@@ -36,7 +35,6 @@ DDMuonDigiSimple::DDMuonDigiSimple(const std::string& name, ISvcLocator* svcLoc)
 
 StatusCode DDMuonDigiSimple::initialize() {
   //Get the number of Layers in the Endcap and Barrel
-  MsgStream log(msgSvc(), name());
   m_geoSvc = serviceLocator()->service("GeoSvc");  // important to initialize m_geoSvc
   if (!m_geoSvc) {
     error() << "Unable to retrieve the GeoSvc" << endmsg;
@@ -52,11 +50,11 @@ StatusCode DDMuonDigiSimple::initialize() {
 
     layersBarrel = yokeBarrelParameters->layers.size();
     if (!yokeBarrelParameters) {
-      log << MSG::ERROR << "oops - yokeBarrelParameters is a null pointer" << endmsg;
+      error() << "oops - yokeBarrelParameters is a null pointer" << endmsg;
     }
 
   } catch (std::exception& e) {
-    log << MSG::DEBUG << "  oops - no Yoke Barrel available: " << e.what() << endmsg;
+    error() << "  oops - no Yoke Barrel available: " << e.what() << endmsg;
   }
   try {
     const auto                                 mainDetector = m_geoSvc->getDetector();
@@ -65,7 +63,7 @@ StatusCode DDMuonDigiSimple::initialize() {
         theDetector.extension<dd4hep::rec::LayeredCalorimeterData>();
     layersEndcap = yokeEndcapParameters->layers.size();
   } catch (std::exception& e) {
-    log << MSG::DEBUG << "  oops - no Yoke Endcap available: " << e.what() << endmsg;
+    debug() << "  oops - no Yoke Endcap available: " << e.what() << endmsg;
   }
 
   //If the vectors are empty, we are keeping everything
@@ -94,8 +92,7 @@ StatusCode DDMuonDigiSimple::initialize() {
 
 std::tuple<edm4hep::CalorimeterHitCollection, edm4hep::CaloHitSimCaloHitLinkCollection> DDMuonDigiSimple::operator()(
     const edm4hep::SimCalorimeterHitCollection& SimCaloHits, const edm4hep::EventHeaderCollection& headers) const {
-  MsgStream log(msgSvc(), name());
-  log << MSG::DEBUG << " process event : " << headers[0].getEventNumber() << " - run  " << headers[0].getRunNumber()
+  debug() << " process event : " << headers[0].getEventNumber() << " - run  " << headers[0].getRunNumber()
           << endmsg;  // headers[0].getRunNumber(),headers[0].getEventNumber()
 
   edm4hep::CalorimeterHitCollection muoncol;

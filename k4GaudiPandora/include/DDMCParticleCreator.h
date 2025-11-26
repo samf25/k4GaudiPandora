@@ -64,7 +64,7 @@ public:
      *  @param  settings the creator settings
      *  @param  pPandora address of the relevant pandora instance
      */
-  DDMCParticleCreator(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+  DDMCParticleCreator(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
 
   /**
      *  @brief  Destructor
@@ -106,8 +106,7 @@ private:
   const Settings          m_settings;  ///< The mc particle creator settings
   const pandora::Pandora& m_pandora;   ///< Reference to the pandora object to create the mc particles
   const float             m_bField;    ///< The bfield  
-
-  IMessageSvc* m_msgSvc;
+  const Gaudi::Algorithm* m_thisAlg;   ///< Pointer to the Gaudi algorithm for logging
 };
 
 #endif  // #ifndef DDMCPARTICLECREATOR_H

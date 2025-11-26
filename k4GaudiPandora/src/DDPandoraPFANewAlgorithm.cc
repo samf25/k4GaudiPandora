@@ -62,25 +62,26 @@ PandoraSlot& DDPandoraPFANewAlgorithm::slotData(const EventContext& ctx) const {
 
   if (!s.initialised) {
     s.pandora  = std::make_unique<pandora::Pandora>();
-    s.geometry = std::make_unique<DDGeometryCreator>(m_geometryCreatorSettings, s.pandora.get(), msgSvc());
-    s.calo     = std::make_unique<DDCaloHitCreator>(m_caloHitCreatorSettings, s.pandora.get(), msgSvc());
+    s.geometry = std::make_unique<DDGeometryCreator>(m_geometryCreatorSettings, s.pandora.get(), this);
+    s.calo     = std::make_unique<DDCaloHitCreator>(m_caloHitCreatorSettings, s.pandora.get(), this);
 
     if (m_settings.m_trackCreatorName == "DDTrackCreatorCLIC") {
-      s.track  = std::make_unique<DDTrackCreatorCLIC>(m_trackCreatorSettings, s.pandora.get(), msgSvc());
+      s.track  = std::make_unique<DDTrackCreatorCLIC>(m_trackCreatorSettings, s.pandora.get(), this);
     } else {
       error() << "Unknown DDTrackCreator: " << m_settings.m_trackCreatorName << endmsg;
       throw GaudiException("Unknown DDTrackCreator", name(), StatusCode::FAILURE);
     }
 
-    s.mc   = std::make_unique<DDMCParticleCreator>(m_mcParticleCreatorSettings, s.pandora.get(), msgSvc());
-    s.pfo  = std::make_unique<DDPfoCreator>(m_pfoCreatorSettings, s.pandora.get(), msgSvc());
+    s.mc   = std::make_unique<DDMCParticleCreator>(m_mcParticleCreatorSettings, s.pandora.get(), this);
+    s.pfo  = std::make_unique<DDPfoCreator>(m_pfoCreatorSettings, s.pandora.get(), this);
 
     // Per-instance registration/geometry/settings (use THIS Pandora)
-    PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, this->RegisterUserComponents(*s.pandora));
-    PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, s.geometry->CreateGeometry());
-    PANDORA_THROW_RESULT_IF(
-        pandora::STATUS_CODE_SUCCESS, !=,
-        PandoraApi::ReadSettings(*s.pandora, m_settings.m_pandoraSettingsXmlFile));
+    PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, 
+      this->RegisterUserComponents(*s.pandora));
+    PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, 
+      s.geometry->CreateGeometry());
+    PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, 
+      PandoraApi::ReadSettings(*s.pandora, m_settings.m_pandoraSettingsXmlFile));
 
     s.initialised = true;
   }
@@ -88,16 +89,16 @@ PandoraSlot& DDPandoraPFANewAlgorithm::slotData(const EventContext& ctx) const {
   return s;
 }
 
-dd4hep::rec::LayeredCalorimeterData* getExtension(unsigned int includeFlag, MsgStream log,unsigned int excludeFlag = 0) {
+dd4hep::rec::LayeredCalorimeterData* getExtension(unsigned int includeFlag, const Gaudi::Algorithm* algorithm,unsigned int excludeFlag = 0) {
   dd4hep::rec::LayeredCalorimeterData* theExtension = 0;
 
   dd4hep::Detector&                      mainDetector = dd4hep::Detector::getInstance();
   const std::vector<dd4hep::DetElement>& theDetectors =
       dd4hep::DetectorSelector(mainDetector).detectors(includeFlag, excludeFlag);
 
-  log << MSG::DEBUG << " getExtension :  includeFlag: " << dd4hep::DetType(includeFlag)
-                    << " excludeFlag: " << dd4hep::DetType(excludeFlag) << "  found : " << theDetectors.size()
-                    << "  - first det: " << theDetectors.at(0).name() << endmsg;
+  algorithm->debug() << " getExtension :  includeFlag: " << dd4hep::DetType(includeFlag)
+                     << " excludeFlag: " << dd4hep::DetType(excludeFlag) << "  found : " << theDetectors.size()
+                     << "  - first det: " << theDetectors.at(0).name() << endmsg;
 
   if (theDetectors.size() != 1) {
     std::stringstream es;
@@ -219,7 +220,9 @@ std::tuple<edm4hep::ClusterCollection, edm4hep::ReconstructedParticleCollection,
     PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, 
       slot.pfo->CreateParticleFlowObjects(
         pClusterCollection, pReconstructedParticleCollection, pStartVertexCollection, MCParticleCollections, 
-        trackCollections, eCalCollections, hCalCollections, mCalCollections, lCalCollections, lhCalCollections));
+        trackCollections, eCalCollections, hCalCollections, mCalCollections, lCalCollections, lhCalCollections
+      )
+    );
 
     PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, PandoraApi::Reset(*slot.pandora));
     this->Reset(slot);
@@ -315,8 +318,6 @@ pandora::StatusCode DDPandoraPFANewAlgorithm::RegisterUserComponents(pandora::Pa
 void DDPandoraPFANewAlgorithm::FinaliseSteeringParameters() {
   // ATTN: This function seems to be necessary for operations that cannot easily be performed at construction of the processor,
   // when the steering file is parsed e.g. the call to GEAR to get the inner bfield
-  MsgStream log(msgSvc(), name());
-
   m_settings.m_pandoraSettingsXmlFile = m_pandoraSettingsXmlFile;
   m_geometryCreatorSettings.m_createGaps = m_createGaps;
   m_pfoCreatorSettings.m_startVertexAlgName = m_startVertexAlgName;
@@ -410,30 +411,30 @@ void DDPandoraPFANewAlgorithm::FinaliseSteeringParameters() {
 
   //Get ECal Barrel extension by type, ignore plugs and rings
   const dd4hep::rec::LayeredCalorimeterData* eCalBarrelExtension =
-      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::ELECTROMAGNETIC | dd4hep::DetType::BARREL), log,
+      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::ELECTROMAGNETIC | dd4hep::DetType::BARREL), this,
                    (dd4hep::DetType::AUXILIARY | dd4hep::DetType::FORWARD));
   //Get ECal Endcap extension by type, ignore plugs and rings
   const dd4hep::rec::LayeredCalorimeterData* eCalEndcapExtension =
-      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::ELECTROMAGNETIC | dd4hep::DetType::ENDCAP), log,
+      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::ELECTROMAGNETIC | dd4hep::DetType::ENDCAP), this,
                    (dd4hep::DetType::AUXILIARY | dd4hep::DetType::FORWARD));
   //Get HCal Barrel extension by type, ignore plugs and rings
   const dd4hep::rec::LayeredCalorimeterData* hCalBarrelExtension =
-      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::HADRONIC | dd4hep::DetType::BARREL), log,
+      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::HADRONIC | dd4hep::DetType::BARREL), this,
                    (dd4hep::DetType::AUXILIARY | dd4hep::DetType::FORWARD));
   //Get HCal Endcap extension by type, ignore plugs and rings
   const dd4hep::rec::LayeredCalorimeterData* hCalEndcapExtension =
-      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::HADRONIC | dd4hep::DetType::ENDCAP), log,
+      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::HADRONIC | dd4hep::DetType::ENDCAP), this,
                    (dd4hep::DetType::AUXILIARY | dd4hep::DetType::FORWARD));
   //Get Muon Barrel extension by type, ignore plugs and rings
   const dd4hep::rec::LayeredCalorimeterData* muonBarrelExtension =
-      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::MUON | dd4hep::DetType::BARREL), log,
+      getExtension((dd4hep::DetType::CALORIMETER | dd4hep::DetType::MUON | dd4hep::DetType::BARREL), this,
                    (dd4hep::DetType::AUXILIARY | dd4hep::DetType::FORWARD));
   //fg: muon endcap is not used :
   // //Get Muon Endcap extension by type, ignore plugs and rings
-  // const dd4hep::rec::LayeredCalorimeterData * muonEndcapExtension= getExtension( ( dd4hep::DetType::CALORIMETER | dd4hep::DetType::MUON | dd4hep::DetType::ENDCAP),  log, ( dd4hep::DetType::AUXILIARY ) );
+  // const dd4hep::rec::LayeredCalorimeterData * muonEndcapExtension= getExtension( ( dd4hep::DetType::CALORIMETER | dd4hep::DetType::MUON | dd4hep::DetType::ENDCAP), this, ( dd4hep::DetType::AUXILIARY ) );
 
   //Get COIL extension
-  const dd4hep::rec::LayeredCalorimeterData* coilExtension = getExtension((dd4hep::DetType::COIL), log);
+  const dd4hep::rec::LayeredCalorimeterData* coilExtension = getExtension((dd4hep::DetType::COIL), this);
 
   m_trackCreatorSettings.m_eCalBarrelInnerSymmetry = eCalBarrelExtension->inner_symmetry;
   m_trackCreatorSettings.m_eCalBarrelInnerPhi0     = eCalBarrelExtension->inner_phi0 / dd4hep::rad;
@@ -474,16 +475,23 @@ void DDPandoraPFANewAlgorithm::FinaliseSteeringParameters() {
 void DDPandoraPFANewAlgorithm::Reset(PandoraSlot& s) const{
   s.calo->Reset();
   s.track->Reset();
-  /*
-  PandoraToLCEventMap::iterator iter = m_pandoraToLCEventMap.find(m_pPandora);
-
-  if (m_pandoraToLCEventMap.end() == iter)
-    throw pandora::StatusCodeException(pandora::STATUS_CODE_FAILURE);
-
-  m_pandoraToLCEventMap.erase(iter);*/
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------
+
+int DDPandoraPFANewAlgorithm::getGeoID(const std::string& detName) const {
+  auto detID_str = m_geoSvc->constantAsString(detName);
+  int detID = -1;
+  if (!detID_str.empty()) {
+    try {
+      detID = std::stoi(detID_str);
+    } catch (...) {
+      debug() << "Failed to convert " << detName << " to int: " << detID_str << endmsg;
+    }
+  }
+  return detID;
+}
+
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 DDPandoraPFANewAlgorithm::Settings::Settings()

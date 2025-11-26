@@ -64,7 +64,7 @@ public:
      *  @param  settings the creator settings
      *  @param  pPandora address of the relevant pandora instance
      */
-  DDPfoCreator(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+  DDPfoCreator(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
 
   /**
      *  @brief  Destructor
@@ -231,7 +231,7 @@ private:
 
   const Settings          m_settings;  ///< The pfo creator settings
   const pandora::Pandora& m_pandora;   ///< Reference to the pandora object from which to extract the pfos
-  IMessageSvc* m_msgSvc;
+  const Gaudi::Algorithm* m_thisAlg;   ///< Pointer to the Gaudi algorithm for logging
 };
 
 #endif  // #ifndef DDPFO_CREATOR_H

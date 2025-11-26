@@ -62,7 +62,7 @@ public:
      *  @param  settings the creator settings
      *  @param  pPandora address of the relevant pandora instance
      */
-  DDGeometryCreator(const Settings& settings, const pandora::Pandora* const pPandora, IMessageSvc* msgSvc);
+  DDGeometryCreator(const Settings& settings, const pandora::Pandora* const pPandora, const Gaudi::Algorithm* algorithm);
 
   /**
      *  @brief  Destructor
@@ -147,14 +147,15 @@ private:
      *  @param  gapWidth the gap width
      *  @param  vertexOffset position offset for vertex that doesn't point back to origin of xy plane
      */
-  pandora::StatusCode CreateRegularBoxGaps(unsigned int symmetryOrder, float phi0, float innerRadius, float outerRadius,
-                                           float minZ, float maxZ, float gapWidth,
-                                           pandora::CartesianVector vertexOffset = pandora::CartesianVector(0, 0,
-                                                                                                            0)) const;
+  pandora::StatusCode CreateRegularBoxGaps(
+      unsigned int symmetryOrder, float phi0, float innerRadius, float outerRadius,
+      float minZ, float maxZ, float gapWidth,
+      pandora::CartesianVector vertexOffset = pandora::CartesianVector(0, 0, 0)
+  ) const;
 
   const Settings          m_settings;  ///< The geometry creator settings
   const pandora::Pandora& m_pPandora;  ///< Address of the pandora object to create the geometry
-  IMessageSvc* m_msgSvc;
+  const Gaudi::Algorithm* m_thisAlg;   ///< Pointer to the Gaudi algorithm for logging
 };
 
 #endif  // #ifndef GEOMETRY_CREATOR_H

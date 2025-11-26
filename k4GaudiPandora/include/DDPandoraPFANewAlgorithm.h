@@ -172,29 +172,15 @@ public:
    const std::vector<const edm4hep::CaloHitSimCaloHitLinkCollection*>& caloLinkCollections
  ) const override;
 
-
-
-  /**
+   /**
      *  @brief  End, called at shutdown
      */
   StatusCode finalize();
 
-  /**
-     *  @brief  Get address of the pandora instance
-     *
-     *  @return address of the pandora instance
-     */
-//   const pandora::Pandora* GetPandora() const;
-
-  /**
-     *  @brief  Get address of the current lcio event
-     *
-     *  @param  pPandora address of the relevant pandora instance
-     *
-     *  @return address of the current lcio event
-     */
-  //static const EVENT::LCEvent* GetCurrentEvent(const pandora::Pandora* const pPandora);
-
+   /**
+    *  @brief  Get the geometry ID for a given detector name
+    */
+  int getGeoID(const std::string& detName) const;
 private:
   /**
      *  @brief  Register user algorithm factories, energy correction functions and particle id functions,
