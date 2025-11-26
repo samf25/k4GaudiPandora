@@ -53,13 +53,13 @@ DDTrackCreatorBase::DDTrackCreatorBase(const Settings& settings, const pandora::
       m_trackToPidMap(TrackToPidMap()),
       m_minimalTrackStateRadiusSquared(0.f),
       m_thisAlg(algorithm),
-      m_ddkaltest(m_thisAlg) {
+      m_ddkaltest(algorithm) {
   const float ecalInnerR           = settings.m_eCalBarrelInnerR;
   const float tsTolerance          = settings.m_trackStateTolerance;
   m_minimalTrackStateRadiusSquared = (ecalInnerR - tsTolerance) * (ecalInnerR - tsTolerance);
 
   m_encoder = dd4hep::DDSegmentation::BitFieldCoder(settings.m_trackingEncodingString);
-  m_ddkaltest.init();
+  m_ddkaltest.init(); 
   m_ddkaltest.setEncoder(m_encoder);
   m_lcTrackFactory = std::make_shared<lc_content::LCTrackFactory>();
 }
